@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102b55">
+  <meta name="description" content="Application du Stade Montois Tennis de Table">
+  <title>Stade Montois TT</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Animation pour faire bouger la raquette du bonhomme */
+    @keyframes wave {
+      0% { transform: rotate(0deg); }
+      20% { transform: rotate(15deg); }
+      40% { transform: rotate(-10deg); }
+      60% { transform: rotate(15deg); }
+      80% { transform: rotate(-5deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .hero-avatar {
+      width: 90px;
+      height: auto;
+      animation: wave 2.5s infinite ease-in-out;
+      transform-origin: bottom center;
+    }
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    /* Style de la boîte de dialogue flottante (Case A4) */
+    #bulleInfo {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      max-width: 280px;
+      background: #102b55;
+      color: #ffffff;
+      padding: 14px 28px 14px 18px;
+      border-radius: 16px 16px 4px 16px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+      z-index: 1000;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      animation: fadeInUp 0.4s ease-out;
+    }
+    #bulleInfo button {
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.8;
+    }
+    #bulleInfo button:hover {
+      opacity: 1;
+    }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="brand">
+      <img src="LOGO ROND.jpeg" alt="Logo Stade Montois TT">
+      <div>
+        <p class="eyebrow">APPLICATION DU CLUB</p>
+        <h1>Stade Montois<br> Tennis de Table</h1>
+      </div>
+    </div>
+    <!-- Le bonhomme animé -->
+    <img src="bonhomme.jpg" alt="Bonjour !" class="hero-avatar">
+  </header>
+  <p class="intro">Toutes les informations du club au même endroit.</p>
+  
+  <main>
+    <!-- 📢 Encart Flash Info (invisible tant que la case A1 est vide) -->
+    <section id="flashInfo" style="display: none; background: #fff3cd; border-left: 5px solid #ffc107; color: #856404; padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+      📢 <span id="texteFlashInfo"></span>
+    </section>
+
+    <section class="menu" aria-label="Rubriques">
+      <a class="tile" href="https://drive.google.com/drive/u/0/folders/1jVjRtxUFW16XcQiyBiWIJUwUuL2w70L_" target="_blank" rel="noopener noreferrer"><span class="emoji">🏆</span><strong>Équipes</strong><small>Date et Lieu</small></a>
+      <a class="tile" href="https://www.youtube.com/@StadeMontoisTennisdeTable" target="_blank" rel="noopener noreferrer"><span class="emoji">▶️</span><strong>Vidéos</strong><small>Matchs, entraînements et directs</small></a>
+      <a class="tile" href="https://www.facebook.com/stademontoistt" target="_blank" rel="noopener noreferrer"><span class="emoji">📘</span><strong>Facebook</strong><small>Actualités du club</small></a>
+      <a class="tile" href="https://chat.whatsapp.com/ECMf8BuR09BAYjncX5iXac?s=cl&p=i&iam=2" target="_blank" rel="noopener noreferrer"><span class="emoji">💬</span><strong>WhatsApp</strong><small>Groupes et échanges</small></a>
+      <a class="tile" href="https://docs.google.com/spreadsheets/d/1PkxeVKZ1zbfUWRuQFZ5VYc06uEgDKwfJ/edit?gid=1487185368#gid=1487185368" target="_blank" rel="noopener noreferrer"><span class="emoji">📅</span><strong>Compétitions</strong><small>Individuelles et calendrier</small></a>
+      <a class="tile" href="https://www.helloasso.com/associations/stade-montois-omnisports-tennis-de-table" target="_blank" rel="noopener noreferrer"><span class="emoji">🤝</span><strong>HelloAsso</strong><small>Adhésions et paiements</small></a>
+      <a class="tile" href="https://drive.google.com/drive/u/0/folders/14zQilGmblymrCXx2L_ZUDhvkyvHktzBp" target="_blank" rel="noopener noreferrer"><span class="emoji">📄</span><strong>Documents</strong><small>Informations à télécharger</small></a>
+      <a class="tile" href="https://pingpocket.fr" target="_blank" rel="noopener noreferrer"><span class="emoji">🏓</span><strong>Pingpocket</strong><small>Classements et résultats</small></a>
+      <a class="tile" href="https://fr.butterfly.tt" target="_blank" rel="noopener noreferrer"><span class="emoji"><img src="logo butterfly.png" alt="Logo Butterfly" style="height: 1.15em; width: auto; vertical-align: middle;"></span><strong>Butterfly</strong><small>Matériel et partenaire</small></a>
+      <a class="tile" href="#" data-section="liens"><span class="emoji">🔗</span><strong>Liens externes</strong><small>Ligue (LNATT) et Comité (CD40)</small></a>
+    </section>
+
+    <section class="panel" id="panel" aria-live="polite">
+      <h2>Bienvenue au club !</h2>
+    </section>
+  </main>
+
+  <!-- 💬 Boîte de dialogue flottante en bas à droite (invisible tant que la case A4 est vide) -->
+  <aside id="bulleInfo" aria-live="polite">
+    <button onclick="document.getElementById('bulleInfo').style.display='none'" aria-label="Fermer la notification">&times;</button>
+    <span id="texteBulleInfo"></span>
+  </aside>
+
+  <footer>Stade Montois Tennis de Table</footer>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js'));
+    }
+  </script>
+  
+  <!-- Script dynamique pour le Flash Info (A1) et la Boîte de dialogue (A4) depuis Google Sheets -->
+  <script>
+    const urlSheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vROcLSItSbZn-h5tLyorTcCdS7IL6EuLbuzwnEHHez7HeFrzoFg-Hmvg6lodTbkKQdy5_s_t2xQPtpl/pub?output=csv";
+
+    function nettoyerCellule(ligne) {
+      if (!ligne) return "";
+      const premiereColonne = ligne.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)[0];
+      return premiereColonne.replace(/^"|"$/g, '').trim();
+    }
+
+    fetch(urlSheet + "&t=" + new Date().getTime())
+      .then(response => response.text())
+      .then(texte => {
+        const lignes = texte.split(/\r?\n/);
+
+        // Case A1 (ligne 1 du tableur -> index 0) : Flash Info en haut
+        const messageA1 = nettoyerCellule(lignes[0]);
+        if (messageA1.length > 0) {
+          document.getElementById('texteFlashInfo').textContent = messageA1;
+          document.getElementById('flashInfo').style.display = 'block';
+        }
+
+        // Case A4 (ligne 4 du tableur -> index 3) : Boîte de dialogue en bas à droite
+        const messageA4 = nettoyerCellule(lignes[3]);
+        if (messageA4.length > 0) {
+          document.getElementById('texteBulleInfo').textContent = messageA4;
+          document.getElementById('bulleInfo').style.display = 'block';
+        }
+      })
+      .catch(err => console.log("Pas de flash info ni de notification"));
+  </script>
+</body>
+</html>
