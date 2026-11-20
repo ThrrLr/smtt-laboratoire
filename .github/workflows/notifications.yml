@@ -20,8 +20,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installer Firebase Admin
-        run: pip install firebase-admin
+      - name: Installer les bibliotheques
+        run: |
+          pip install firebase-admin
+          pip install google-api-python-client
+          pip install google-auth
 
       - name: Envoyer les notifications
         env:
