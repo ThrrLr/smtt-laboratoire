@@ -2,7 +2,8 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
-const CACHE = "smtt-v42";
+const CACHE = "smtt-v43";
+
 const FILES = [
   "./",
   "./index.html",
@@ -25,18 +26,36 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const titre = payload.data?.title || "Stade Montois TT";
+  const donnees = payload.data || {};
+  const notification = payload.notification || {};
 
-  const options = {
-    body: payload.data?.body || "Une nouvelle information est disponible.",
-    icon: "./icons/icon.svg"
-  };
+  const titre =
+    notification.title ||
+    donnees.title ||
+    "Stade Montois TT";
 
-  self.registration.showNotification(titre, options);
+  const corps =
+    notification.body ||
+    donnees.body ||
+    "Une nouvelle information est disponible.";
+
+  const url =
+    donnees.appUrl ||
+    "https://thrrlr.github.io/smtt/";
+
+  return self.registration.showNotification(titre, {
+    body: corps,
+    icon: notification.icon || "./icons/icon.svg",
+    data: { url: url }
+  });
 });
 
 self.addEventListener("notificationclick", event => {
   event.notification.close();
+
+  const url =
+    event.notification.data?.url ||
+    "https://thrrlr.github.io/smtt/";
 
   event.waitUntil(
     self.clients.matchAll({
@@ -44,15 +63,22 @@ self.addEventListener("notificationclick", event => {
       includeUncontrolled: true
     }).then(clientList => {
       for (const client of clientList) {
-        if ("focus" in client) return client.focus();
+        if (
+          client.url.startsWith("https://thrrlr.github.io/smtt/") &&
+          "focus" in client
+        ) {
+          return client.focus();
+        }
       }
-      return self.clients.openWindow("./");
+
+      return self.clients.openWindow(url);
     })
   );
 });
 
 self.addEventListener("install", event => {
   self.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE).then(cache => cache.addAll(FILES))
   );
@@ -60,9 +86,13 @@ self.addEventListener("install", event => {
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE).map(key => caches.delete(key))
-    )).then(() => self.clients.claim())
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key !== CACHE)
+          .map(key => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
