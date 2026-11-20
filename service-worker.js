@@ -14,7 +14,7 @@ const FILES = [
 ];
 
 firebase.initializeApp({
-  apiKey: "AIzaSyCi0apSMq-xuZAj-rahE32w5HXtOh604o",
+  apiKey: "AIzaSyCi0apSMq-xuZAj-rahE32w5HXtOh604oU",
   authDomain: "smtt-notifications.firebaseapp.com",
   projectId: "smtt-notifications",
   storageBucket: "smtt-notifications.firebasestorage.app",
