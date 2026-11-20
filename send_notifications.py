@@ -87,7 +87,6 @@ drive = build(
 
 def lire_dossier(folder_id, source_name, category):
     fichiers = []
-
     page_token = None
 
     while True:
@@ -200,7 +199,6 @@ def traiter_fichier(fichier):
             "category": fichier["category"]
         }
 
-        # Première découverte : mémorisation sans notification.
         if not snapshot.exists:
             transaction.set(state_ref, nouvel_etat)
             return "initialisation"
@@ -213,7 +211,6 @@ def traiter_fichier(fichier):
         ):
             return "inchangé"
 
-        # Fichier modifié : mémorisation et création de la notification.
         transaction.set(state_ref, nouvel_etat)
         transaction.set(notification_ref, notification_data)
 
@@ -402,9 +399,20 @@ def envoyer_notifications_en_attente():
 
         donnees = notification.to_dict()
 
+        titre = str(
+            donnees.get("title", "Stade Montois TT")
+        )
+
+        corps = str(
+            donnees.get(
+                "body",
+                "Une nouvelle information est disponible."
+            )
+        )
+
         message_data = {
-            "title": str(donnees.get("title", "Stade Montois TT")),
-            "body": str(donnees.get("body", "Une nouvelle information est disponible.")),
+            "title": titre,
+            "body": corps,
             "category": str(donnees.get("category", "")),
             "notificationId": notification.id
         }
@@ -414,12 +422,33 @@ def envoyer_notifications_en_attente():
         for token in tokens:
             try:
                 message = messaging.Message(
+                    notification=messaging.Notification(
+                        title=titre,
+                        body=corps
+                    ),
                     data=message_data,
-                    token=token
+                    token=token,
+                    webpush=messaging.WebpushConfig(
+                        headers={
+                            "Urgency": "high"
+                        },
+                        notification=messaging.WebpushNotification(
+                            icon="https://thrrlr.github.io/smtt/icons/icon.svg"
+                        ),
+                        fcm_options=messaging.WebpushFCMOptions(
+                            link="https://thrrlr.github.io/smtt/"
+                        )
+                    )
                 )
 
-                messaging.send(message)
+                resultat = messaging.send(message)
+
                 nombre_envoye += 1
+
+                print(
+                    "Push accepté par Firebase :",
+                    resultat
+                )
 
             except Exception as erreur:
                 print("Erreur envoi notification :", erreur)
@@ -431,7 +460,7 @@ def envoyer_notifications_en_attente():
 
             print(
                 "Notification envoyée :",
-                donnees.get("body", "")
+                corps
             )
 
 
@@ -459,14 +488,14 @@ def main():
             resultat
         )
 
-    # Surveillance de la chaîne YouTube.
     surveiller_youtube()
 
-    # Envoi des notifications Drive et YouTube.
     envoyer_notifications_en_attente()
 
     print("Surveillance terminée.")
 
 
 if __name__ == "__main__":
+    main()
+
     main()
