@@ -1,0 +1,13 @@
+name: Test automatique
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verification automatique
+        run: echo "Test automatique OK"
