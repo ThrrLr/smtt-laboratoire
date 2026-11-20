@@ -2,7 +2,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
-const CACHE = "smtt-v41";
+const CACHE = "smtt-v42";
 const FILES = [
   "./",
   "./index.html",
@@ -25,10 +25,10 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const titre = payload.notification?.title || "Stade Montois TT";
+  const titre = payload.data?.title || "Stade Montois TT";
 
   const options = {
-    body: payload.notification?.body || "Une nouvelle information est disponible.",
+    body: payload.data?.body || "Une nouvelle information est disponible.",
     icon: "./icons/icon.svg"
   };
 
