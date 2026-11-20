@@ -14,15 +14,19 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
+  // Firebase affiche automatiquement les messages
+  // qui contiennent déjà une notification.
+  if (payload.notification) {
+    return;
+  }
+
   const donnees = payload.data || {};
 
-  const titre = donnees.title || "Stade Montois TT";
-
-  const options = {
-    body: donnees.body || "Une nouvelle information est disponible.",
-    icon: "./icons/icon.svg",
-    badge: "./icons/icon.svg"
-  };
-
-  self.registration.showNotification(titre, options);
+  self.registration.showNotification(
+    donnees.title || "Stade Montois TT",
+    {
+      body: donnees.body || "Une nouvelle information est disponible.",
+      icon: "./icons/icon.svg"
+    }
+  );
 });
