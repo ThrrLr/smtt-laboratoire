@@ -2,7 +2,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
-const CACHE = "smtt-v40";
+const CACHE = "smtt-v41";
 const FILES = [
   "./",
   "./index.html",
