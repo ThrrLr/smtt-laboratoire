@@ -26,4 +26,5 @@ jobs:
       - name: Envoyer les notifications
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TEST_UID: ${{ secrets.TEST_UID }}
         run: python send_notifications.py
