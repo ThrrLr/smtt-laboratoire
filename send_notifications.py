@@ -42,4 +42,3 @@ message = messaging.Message(
 response = messaging.send(message)
 
 print("Notification envoyée avec succès :", response)
-e)
