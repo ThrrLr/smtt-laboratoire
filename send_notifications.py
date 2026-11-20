@@ -28,13 +28,11 @@ token = user.to_dict().get("fcmToken")
 if not token:
     raise Exception("Aucun téléphone enregistré pour cet utilisateur")
 
-# Notification de test
+# Notification de test au format data uniquement
 message = messaging.Message(
-    notification=messaging.Notification(
-        title="🏓 Stade Montois TT",
-        body="Bravo ! Les notifications SMTT fonctionnent."
-    ),
     data={
+        "title": "🏓 Stade Montois TT",
+        "body": "Bravo ! Les notifications SMTT fonctionnent.",
         "category": "videos",
         "test": "true"
     },
@@ -44,3 +42,4 @@ message = messaging.Message(
 response = messaging.send(message)
 
 print("Notification envoyée avec succès :", response)
+e)
