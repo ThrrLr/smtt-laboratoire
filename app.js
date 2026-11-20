@@ -121,10 +121,10 @@ document.querySelectorAll(".menu .tile").forEach(link => {
     dot.style.cssText = `
       display:none;
       position:absolute;
-      top:9px;
-      right:9px;
-      width:12px;
-      height:12px;
+      top:8px;
+      right:8px;
+      width:17px;
+      height:17px;
       background:#e52323;
       border:2px solid white;
       border-radius:50%;
