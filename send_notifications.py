@@ -1,8 +1,9 @@
 
-
 import os
 import json
 import hashlib
+import urllib.request
+import xml.etree.ElementTree as ET
 
 import firebase_admin
 from firebase_admin import credentials, firestore, messaging
@@ -40,6 +41,14 @@ DRIVE_SOURCES = [
         "file_id": "1PkxeVKZ1zbfUWRuQFZ5VYc06uEgDKwfJ"
     }
 ]
+
+# Chaîne YouTube du Stade Montois TT
+YOUTUBE_CHANNEL_ID = "UCUPOXsxa74oOcfkGrx079WQ"
+
+YOUTUBE_FEED_URL = (
+    "https://www.youtube.com/feeds/videos.xml?channel_id="
+    + YOUTUBE_CHANNEL_ID
+)
 
 
 # ==========================================
@@ -214,6 +223,155 @@ def traiter_fichier(fichier):
 
 
 # ==========================================
+# SURVEILLANCE YOUTUBE
+# ==========================================
+
+def surveiller_youtube():
+
+    print("Surveillance YouTube SMTT démarrée.")
+
+    try:
+        requete = urllib.request.Request(
+            YOUTUBE_FEED_URL,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        with urllib.request.urlopen(requete, timeout=20) as reponse:
+            contenu = reponse.read()
+
+        racine = ET.fromstring(contenu)
+
+        atom = "{http://www.w3.org/2005/Atom}"
+        yt = "{http://www.youtube.com/xml/schemas/2015}"
+
+        videos = []
+
+        for entree in racine.findall(atom + "entry"):
+
+            video_id = entree.findtext(yt + "videoId")
+            titre = entree.findtext(atom + "title")
+
+            lien = entree.find(atom + "link")
+            url = (
+                lien.get("href")
+                if lien is not None
+                else f"https://www.youtube.com/watch?v={video_id}"
+            )
+
+            if video_id and titre:
+                videos.append({
+                    "id": video_id,
+                    "title": titre,
+                    "url": url
+                })
+
+        if not videos:
+            print("Aucune vidéo trouvée dans le flux YouTube.")
+            return
+
+        etat_ref = db.collection("youtube_monitor").document(
+            YOUTUBE_CHANNEL_ID
+        )
+
+        etat = etat_ref.get()
+
+        # Premier passage : mémorisation des vidéos existantes.
+        if not etat.exists:
+
+            batch = db.batch()
+
+            for video in videos:
+                video_state_id = hashlib.sha256(
+                    video["id"].encode("utf-8")
+                ).hexdigest()
+
+                video_ref = db.collection("youtube_seen").document(
+                    video_state_id
+                )
+
+                batch.set(video_ref, {
+                    "videoId": video["id"],
+                    "title": video["title"],
+                    "initialized": True
+                })
+
+            batch.set(etat_ref, {
+                "initialized": True,
+                "lastVideoId": videos[0]["id"]
+            })
+
+            batch.commit()
+
+            print(
+                len(videos),
+                "vidéos existantes mémorisées sans notification."
+            )
+
+            return
+
+        # Passages suivants : recherche des nouvelles vidéos.
+        nouvelles = 0
+
+        for video in reversed(videos):
+
+            video_state_id = hashlib.sha256(
+                video["id"].encode("utf-8")
+            ).hexdigest()
+
+            video_ref = db.collection("youtube_seen").document(
+                video_state_id
+            )
+
+            if video_ref.get().exists:
+                continue
+
+            notification_id = hashlib.sha256(
+                f"youtube_{video['id']}".encode("utf-8")
+            ).hexdigest()
+
+            notification_ref = db.collection(
+                "notifications"
+            ).document(notification_id)
+
+            batch = db.batch()
+
+            batch.set(video_ref, {
+                "videoId": video["id"],
+                "title": video["title"],
+                "initialized": True
+            })
+
+            batch.set(notification_ref, {
+                "category": "videos",
+                "title": "🏓 Nouvelle vidéo SMTT",
+                "body": f"Nouvelle vidéo sur la chaîne du club : {video['title']}",
+                "source": "YouTube",
+                "videoId": video["id"],
+                "videoUrl": video["url"],
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "pushSent": False
+            })
+
+            batch.commit()
+
+            nouvelles += 1
+
+            print("Nouvelle vidéo détectée :", video["title"])
+
+        batch = db.batch()
+        batch.set(etat_ref, {
+            "initialized": True,
+            "lastVideoId": videos[0]["id"]
+        }, merge=True)
+        batch.commit()
+
+        print(nouvelles, "nouvelle(s) vidéo(s) détectée(s).")
+
+    except Exception as erreur:
+        print("Erreur surveillance YouTube :", erreur)
+
+
+# ==========================================
 # ENVOI DES NOTIFICATIONS AUX IPHONES
 # ==========================================
 
@@ -301,6 +459,10 @@ def main():
             resultat
         )
 
+    # Surveillance de la chaîne YouTube.
+    surveiller_youtube()
+
+    # Envoi des notifications Drive et YouTube.
     envoyer_notifications_en_attente()
 
     print("Surveillance terminée.")
