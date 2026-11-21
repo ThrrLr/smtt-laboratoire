@@ -574,13 +574,13 @@ def envoyer_notifications_en_attente():
     tokens = []
 
     for utilisateur in utilisateurs:
-        donnees = utilisateur.to_dict()
+        donnees = utilisateur.to_dict() or {}
 
-        if (
-            donnees.get("notificationsEnabled") is True
-            and donnees.get("fcmToken")
-        ):
-            tokens.append(donnees["fcmToken"])
+        notif_activee = donnees.get("notificationsEnabled") is True
+        jeton = str(donnees.get("fcmToken") or "").strip()
+
+        if notif_activee and jeton:
+            tokens.append(jeton)
 
     if not tokens:
         print("Aucun téléphone avec notifications activées.")
@@ -595,7 +595,7 @@ def envoyer_notifications_en_attente():
 
     for notification in notifications:
 
-        donnees = notification.to_dict()
+        donnees = notification.to_dict() or {}
 
         titre = str(
             donnees.get("title", "Stade Montois TT")
