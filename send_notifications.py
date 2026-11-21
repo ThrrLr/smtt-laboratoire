@@ -1,4 +1,3 @@
-
 import os
 import json
 import hashlib
@@ -156,7 +155,12 @@ def recuperer_toutes_les_sources():
 # MÉMOIRE DES FICHIERS DÉJÀ SURVEILLÉS
 # ==========================================
 
-def traiter_fichier(fichier):
+def base_drive_deja_initialisee():
+    premier_doc = next(db.collection("drive_monitor").limit(1).stream(), None)
+    return premier_doc is not None
+
+
+def traiter_fichier(fichier, notifier_nouveaux=True):
 
     file_id = fichier["id"]
     modified_time = fichier.get("modifiedTime", "")
@@ -201,6 +205,9 @@ def traiter_fichier(fichier):
 
         if not snapshot.exists:
             transaction.set(state_ref, nouvel_etat)
+            if notifier_nouveaux:
+                transaction.set(notification_ref, notification_data)
+                return "nouveau"
             return "initialisation"
 
         ancien_etat = snapshot.to_dict()
@@ -472,13 +479,18 @@ def main():
 
     print("Surveillance Google Drive SMTT démarrée.")
 
+    notifier_nouveaux = base_drive_deja_initialisee()
+
     fichiers = recuperer_toutes_les_sources()
 
     print(len(fichiers), "fichiers trouvés.")
 
     for fichier in fichiers:
 
-        resultat = traiter_fichier(fichier)
+        resultat = traiter_fichier(
+            fichier,
+            notifier_nouveaux=notifier_nouveaux
+        )
 
         print(
             fichier["source"],
@@ -496,6 +508,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
     main()
