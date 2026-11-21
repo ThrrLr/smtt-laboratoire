@@ -557,9 +557,15 @@ def abonner_tokens_au_topic(tokens):
             reponse = messaging.subscribe_to_topic(lot, FACEBOOK_TOPIC)
             succes = getattr(reponse, "success_count", 0)
             echecs = getattr(reponse, "failure_count", 0)
-            erreurs = getattr(reponse, "errors", [])
+            erreurs_detail = [
+                {
+                    "index": getattr(err, "index", None),
+                    "reason": getattr(err, "reason", str(err)),
+                }
+                for err in getattr(reponse, "errors", [])
+            ]
             print(
-                f"Détail topic '{FACEBOOK_TOPIC}' : succès={succes}, échecs={echecs}, erreurs={erreurs}"
+                f"Détail topic '{FACEBOOK_TOPIC}' : succès={succes}, échecs={echecs}, erreurs={erreurs_detail}"
             )
             total_abonnes += succes
         except Exception as erreur:
