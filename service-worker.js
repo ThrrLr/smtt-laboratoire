@@ -3,7 +3,7 @@
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
-const CACHE = "smtt-v48";
+const CACHE = "smtt-v49";
 const BASE_URL = new URL("./", self.location).href;
 
 const FILES = [
