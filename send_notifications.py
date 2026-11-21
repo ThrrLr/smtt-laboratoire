@@ -535,7 +535,7 @@ def surveiller_facebook():
 
 
 # ==========================================
-# ABONNEMENT AUTOMATIQUE AU SUJET smtt_actus
+# ABONNEMENT OPTIONNEL AU SUJET smtt_actus
 # ==========================================
 
 def abonner_tokens_au_topic(tokens):
@@ -543,11 +543,7 @@ def abonner_tokens_au_topic(tokens):
     if not tokens or not FACEBOOK_TOPIC:
         return
 
-    # Suppression des doublons tout en gardant l'ordre
     tokens_uniques = list(dict.fromkeys(tokens))
-    print(f"Jetons actifs trouvés pour '{FACEBOOK_TOPIC}' : {len(tokens_uniques)}")
-
-    # Firebase accepte jusqu'à 1000 tokens par appel
     taille_lot = 1000
     total_abonnes = 0
 
@@ -556,23 +552,12 @@ def abonner_tokens_au_topic(tokens):
         try:
             reponse = messaging.subscribe_to_topic(lot, FACEBOOK_TOPIC)
             succes = getattr(reponse, "success_count", 0)
-            echecs = getattr(reponse, "failure_count", 0)
-            erreurs_detail = [
-                {
-                    "index": getattr(err, "index", None),
-                    "reason": getattr(err, "reason", str(err)),
-                }
-                for err in getattr(reponse, "errors", [])
-            ]
-            print(
-                f"Détail topic '{FACEBOOK_TOPIC}' : succès={succes}, échecs={echecs}, erreurs={erreurs_detail}"
-            )
             total_abonnes += succes
         except Exception as erreur:
-            print(f"Erreur abonnement au topic {FACEBOOK_TOPIC} :", erreur)
+            print(f"Info topic {FACEBOOK_TOPIC} :", erreur)
 
     print(
-        f"Synchronisation topic '{FACEBOOK_TOPIC}' terminée ({total_abonnes} jeton(s) traité(s))."
+        f"Synchronisation topic '{FACEBOOK_TOPIC}' terminée ({total_abonnes}/{len(tokens_uniques)} abonné(s) via topic)."
     )
 
 
@@ -599,14 +584,17 @@ def envoyer_notifications_en_attente():
         print("Aucun téléphone avec notifications activées.")
         return
 
-    # Abonne automatiquement tous les jetons actifs au sujet smtt_actus
+    print(f"{len(tokens)} jeton(s) actif(s) trouvé(s) dans Firestore.")
     abonner_tokens_au_topic(tokens)
 
     notifications = db.collection("notifications").where(
         "pushSent", "==", False
     ).stream()
 
-    for notification in notifications:
+    en_attente = list(notifications)
+    print(f"{len(en_attente)} notification(s) en attente d'envoi.")
+
+    for notification in en_attente:
 
         donnees = notification.to_dict() or {}
 
