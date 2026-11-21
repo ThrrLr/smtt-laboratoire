@@ -1,4 +1,3 @@
-
 // ==========================================
 // STADE MONTOIS TT - APPLICATION LABORATOIRE
 // ==========================================
@@ -234,6 +233,7 @@ auth.signInAnonymously()
       }, { merge: true });
 
     ecouterNotifications();
+    initialiserEcoutePremierPlan();
 
   })
   .catch(error => {
@@ -241,8 +241,118 @@ auth.signInAnonymously()
   });
 
 // ==========================================
-// BOUTON D'ACTIVATION DES NOTIFICATIONS
+// BOUTON & GESTION DES NOTIFICATIONS PUSH
 // ==========================================
+
+async function obtenirRegistrationSW() {
+  if (window.smttServiceWorkerRegistration) {
+    return await window.smttServiceWorkerRegistration;
+  }
+  if ("serviceWorker" in navigator) {
+    return await navigator.serviceWorker.ready;
+  }
+  throw new Error("Service worker indisponible.");
+}
+
+function afficherBandeauNotification(titre, corps, url) {
+  const existant = document.querySelector("#smtt-foreground-banner");
+  if (existant) existant.remove();
+
+  const bandeau = document.createElement("div");
+  bandeau.id = "smtt-foreground-banner";
+  bandeau.style.cssText = `
+    position:fixed;
+    left:12px;
+    right:12px;
+    bottom:14px;
+    z-index:9999;
+    background:#102b55;
+    color:#ffffff;
+    padding:14px 16px;
+    border-radius:12px;
+    box-shadow:0 6px 20px rgba(0,0,0,.25);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  `;
+
+  bandeau.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <strong style="font-size:15px;">🔔 ${titre}</strong>
+      <button type="button" id="smtt-close-banner" style="background:none;border:0;color:#fff;font-size:18px;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <p style="margin:0;font-size:14px;opacity:.95;">${corps}</p>
+  `;
+
+  bandeau.addEventListener("click", (e) => {
+    if (e.target.id === "smtt-close-banner") {
+      bandeau.remove();
+      return;
+    }
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+    bandeau.remove();
+  });
+
+  document.body.appendChild(bandeau);
+
+  setTimeout(() => {
+    bandeau.remove();
+  }, 7000);
+}
+
+let ecoutePremierPlanActive = false;
+
+async function initialiserEcoutePremierPlan() {
+  if (ecoutePremierPlanActive) return;
+
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+
+    const supported = await firebase.messaging.isSupported();
+    if (!supported) return;
+
+    const registration = await obtenirRegistrationSW();
+    const messaging = firebase.messaging();
+
+    const bouton = document.querySelector(".intro + button");
+    if (bouton) {
+      bouton.textContent = "✓ Notifications activées";
+    }
+
+    const tokenActuel = await messaging.getToken({
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: registration
+    }).catch(() => null);
+
+    if (tokenActuel && utilisateur) {
+      await db.collection("users")
+        .doc(utilisateur.uid)
+        .set({
+          fcmToken: tokenActuel,
+          notificationsEnabled: true,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
+
+    messaging.onMessage((payload) => {
+      const donnees = payload.data || {};
+      const notif = payload.notification || {};
+      const titre = donnees.title || notif.title || "Stade Montois TT";
+      const corps = donnees.body || notif.body || "Une nouvelle information est disponible.";
+      const url = donnees.appUrl || "";
+
+      afficherBandeauNotification(titre, corps, url);
+    });
+
+    ecoutePremierPlanActive = true;
+  } catch (err) {
+    console.warn("Écoute premier plan non initialisée :", err);
+  }
+}
 
 function ajouterBoutonNotifications() {
   const intro = document.querySelector(".intro");
@@ -250,7 +360,10 @@ function ajouterBoutonNotifications() {
 
   const bouton = document.createElement("button");
 
-  bouton.textContent = "🔔 Activer les notifications";
+  bouton.textContent =
+    ("Notification" in window && Notification.permission === "granted")
+      ? "✓ Notifications activées"
+      : "🔔 Activer les notifications";
   bouton.type = "button";
 
   bouton.style.cssText = `
@@ -311,12 +424,7 @@ async function activerNotifications() {
       return;
     }
 
-    const registration = await window.smttServiceWorkerRegistration;
-
-    if (!registration) {
-      throw new Error("Service worker indisponible.");
-    }
-
+    const registration = await obtenirRegistrationSW();
     const messaging = firebase.messaging();
 
     const token = await messaging.getToken({
@@ -336,7 +444,11 @@ async function activerNotifications() {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
 
-    bouton.textContent = "✓ Notifications activées";
+    if (bouton) {
+      bouton.textContent = "✓ Notifications activées";
+    }
+
+    initialiserEcoutePremierPlan();
     alert("Les notifications sont activées sur cet appareil !");
 
   } catch (error) {
