@@ -49,6 +49,10 @@ YOUTUBE_FEED_URL = (
     + YOUTUBE_CHANNEL_ID
 )
 
+# Flux RSS Facebook (FetchRSS) du Stade Montois TT
+FACEBOOK_FEED_URL = "https://fetchrss.com/feed/1xUlSA4LZE6M1xUlR77gK5bu.rss"
+FACEBOOK_TOPIC = "smtt_actus"
+
 
 # ==========================================
 # CONNEXION FIREBASE
@@ -352,6 +356,7 @@ def surveiller_youtube():
                 "source": "YouTube",
                 "videoId": video["id"],
                 "videoUrl": video["url"],
+                "url": video["url"],
                 "createdAt": firestore.SERVER_TIMESTAMP,
                 "pushSent": False
             })
@@ -373,6 +378,189 @@ def surveiller_youtube():
 
     except Exception as erreur:
         print("Erreur surveillance YouTube :", erreur)
+
+
+# ==========================================
+# SURVEILLANCE FACEBOOK (FETCHRSS)
+# ==========================================
+
+def surveiller_facebook():
+
+    if not FACEBOOK_FEED_URL:
+        print("Aucun flux Facebook configuré.")
+        return
+
+    print("Surveillance Facebook SMTT démarrée.")
+
+    try:
+        requete = urllib.request.Request(
+            FACEBOOK_FEED_URL,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        with urllib.request.urlopen(requete, timeout=20) as reponse:
+            contenu = reponse.read()
+
+        racine = ET.fromstring(contenu)
+
+        posts = []
+
+        # Format RSS classique (<item>)
+        for item in racine.findall(".//item"):
+            guid = (item.findtext("guid") or "").strip()
+            lien = (item.findtext("link") or "").strip()
+            titre = (item.findtext("title") or "").strip()
+            description = (item.findtext("description") or "").strip()
+
+            identifiant = guid or lien or f"{titre}_{description[:80]}"
+            resume = titre or description[:100] or "Nouvelle publication Facebook du club."
+
+            if identifiant:
+                posts.append({
+                    "id": identifiant,
+                    "title": "🏓 Actualité Facebook SMTT",
+                    "body": resume,
+                    "url": lien or "https://www.facebook.com"
+                })
+
+        # Repli format Atom (<entry>) si nécessaire
+        if not posts:
+            atom = "{http://www.w3.org/2005/Atom}"
+            for entry in racine.findall(f"{atom}entry"):
+                entry_id = (entry.findtext(f"{atom}id") or "").strip()
+                titre = (entry.findtext(f"{atom}title") or "").strip()
+                lien_elem = entry.find(f"{atom}link")
+                lien = (lien_elem.get("href") if lien_elem is not None else "") or ""
+                identifiant = entry_id or lien or titre
+                if identifiant:
+                    posts.append({
+                        "id": identifiant,
+                        "title": "🏓 Actualité Facebook SMTT",
+                        "body": titre or "Nouvelle publication Facebook du club.",
+                        "url": lien or "https://www.facebook.com"
+                    })
+
+        if not posts:
+            print("Aucune publication trouvée dans le flux Facebook.")
+            return
+
+        etat_id = hashlib.sha256(
+            FACEBOOK_FEED_URL.encode("utf-8")
+        ).hexdigest()
+
+        etat_ref = db.collection("facebook_monitor").document(etat_id)
+        etat = etat_ref.get()
+
+        # Premier passage : mémorisation des publications existantes sans notifier.
+        if not etat.exists:
+            batch = db.batch()
+
+            for post in posts:
+                post_hash = hashlib.sha256(
+                    post["id"].encode("utf-8")
+                ).hexdigest()
+
+                post_ref = db.collection("facebook_seen").document(post_hash)
+                batch.set(post_ref, {
+                    "postId": post["id"],
+                    "url": post["url"],
+                    "initialized": True
+                })
+
+            batch.set(etat_ref, {
+                "initialized": True,
+                "lastPostId": posts[0]["id"]
+            })
+
+            batch.commit()
+            print(
+                len(posts),
+                "publications Facebook existantes mémorisées sans notification."
+            )
+            return
+
+        # Passages suivants : détection des nouvelles publications.
+        nouvelles = 0
+
+        for post in reversed(posts):
+            post_hash = hashlib.sha256(
+                post["id"].encode("utf-8")
+            ).hexdigest()
+
+            post_ref = db.collection("facebook_seen").document(post_hash)
+            if post_ref.get().exists:
+                continue
+
+            notification_id = hashlib.sha256(
+                f"facebook_{post['id']}".encode("utf-8")
+            ).hexdigest()
+
+            notification_ref = db.collection("notifications").document(
+                notification_id
+            )
+
+            batch = db.batch()
+            batch.set(post_ref, {
+                "postId": post["id"],
+                "url": post["url"],
+                "initialized": True
+            })
+
+            batch.set(notification_ref, {
+                "category": "facebook",
+                "title": post["title"],
+                "body": post["body"],
+                "source": "Facebook",
+                "url": post["url"],
+                "appUrl": post["url"],
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "pushSent": False
+            })
+
+            batch.commit()
+            nouvelles += 1
+            print("Nouvelle publication Facebook détectée :", post["body"])
+
+        batch = db.batch()
+        batch.set(etat_ref, {
+            "initialized": True,
+            "lastPostId": posts[0]["id"]
+        }, merge=True)
+        batch.commit()
+
+        print(nouvelles, "nouvelle(s) publication(s) Facebook détectée(s).")
+
+    except Exception as erreur:
+        print("Erreur surveillance Facebook :", erreur)
+
+
+# ==========================================
+# ABONNEMENT AUTOMATIQUE AU SUJET smtt_actus
+# ==========================================
+
+def abonner_tokens_au_topic(tokens):
+
+    if not tokens or not FACEBOOK_TOPIC:
+        return
+
+    # Suppression des doublons tout en gardant l'ordre
+    tokens_uniques = list(dict.fromkeys(tokens))
+
+    # Firebase accepte jusqu'à 1000 tokens par appel
+    taille_lot = 1000
+    total_abonnes = 0
+
+    for i in range(0, len(tokens_uniques), taille_lot):
+        lot = tokens_uniques[i:i + taille_lot]
+        try:
+            reponse = messaging.subscribe_to_topic(lot, FACEBOOK_TOPIC)
+            total_abonnes += getattr(reponse, "success_count", len(lot))
+        except Exception as erreur:
+            print(f"Erreur abonnement au topic {FACEBOOK_TOPIC} :", erreur)
+
+    print(
+        f"Synchronisation topic '{FACEBOOK_TOPIC}' terminée ({total_abonnes} jeton(s) traité(s))."
+    )
 
 
 # ==========================================
@@ -398,6 +586,9 @@ def envoyer_notifications_en_attente():
         print("Aucun téléphone avec notifications activées.")
         return
 
+    # Abonne automatiquement tous les jetons actifs au sujet smtt_actus
+    abonner_tokens_au_topic(tokens)
+
     notifications = db.collection("notifications").where(
         "pushSent", "==", False
     ).stream()
@@ -417,11 +608,20 @@ def envoyer_notifications_en_attente():
             )
         )
 
+        lien_cible = str(
+            donnees.get("url")
+            or donnees.get("appUrl")
+            or donnees.get("videoUrl")
+            or "https://thrrlr.github.io/smtt/"
+        )
+
         message_data = {
             "title": titre,
             "body": corps,
             "category": str(donnees.get("category", "")),
-            "notificationId": notification.id
+            "notificationId": notification.id,
+            "url": lien_cible,
+            "appUrl": lien_cible
         }
 
         nombre_envoye = 0
@@ -443,7 +643,7 @@ def envoyer_notifications_en_attente():
                             icon="https://thrrlr.github.io/smtt/icons/icon.svg"
                         ),
                         fcm_options=messaging.WebpushFCMOptions(
-                            link="https://thrrlr.github.io/smtt/"
+                            link=lien_cible
                         )
                     )
                 )
@@ -501,6 +701,8 @@ def main():
         )
 
     surveiller_youtube()
+
+    surveiller_facebook()
 
     envoyer_notifications_en_attente()
 
