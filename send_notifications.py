@@ -545,6 +545,7 @@ def abonner_tokens_au_topic(tokens):
 
     # Suppression des doublons tout en gardant l'ordre
     tokens_uniques = list(dict.fromkeys(tokens))
+    print(f"Jetons actifs trouvés pour '{FACEBOOK_TOPIC}' : {len(tokens_uniques)}")
 
     # Firebase accepte jusqu'à 1000 tokens par appel
     taille_lot = 1000
@@ -554,7 +555,13 @@ def abonner_tokens_au_topic(tokens):
         lot = tokens_uniques[i:i + taille_lot]
         try:
             reponse = messaging.subscribe_to_topic(lot, FACEBOOK_TOPIC)
-            total_abonnes += getattr(reponse, "success_count", len(lot))
+            succes = getattr(reponse, "success_count", 0)
+            echecs = getattr(reponse, "failure_count", 0)
+            erreurs = getattr(reponse, "errors", [])
+            print(
+                f"Détail topic '{FACEBOOK_TOPIC}' : succès={succes}, échecs={echecs}, erreurs={erreurs}"
+            )
+            total_abonnes += succes
         except Exception as erreur:
             print(f"Erreur abonnement au topic {FACEBOOK_TOPIC} :", erreur)
 
