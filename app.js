@@ -363,7 +363,7 @@ async function initialiserEcoutePremierPlan() {
       const notif = payload.notification || {};
       const titre = donnees.title || notif.title || "Stade Montois TT";
       const corps = donnees.body || notif.body || "Une nouvelle information est disponible.";
-      const url = donnees.appUrl || "";
+      const url = donnees.appUrl || donnees.url || "";
 
       afficherBandeauNotification(titre, corps, url);
     });
