@@ -141,6 +141,8 @@ document.querySelectorAll(".menu .tile").forEach(link => {
 let utilisateur = null;
 let notificationsActives = [];
 let lectures = new Set();
+let idsConnus = new Set();
+let premierSnapshotRecu = false;
 
 function actualiserPastilles() {
   menuLinks.forEach(({ link, category }) => {
@@ -199,6 +201,24 @@ function ecouterNotifications() {
       id: doc.id,
       ...doc.data()
     }));
+
+    if (!premierSnapshotRecu) {
+      idsConnus = new Set(notificationsActives.map(n => n.id));
+      premierSnapshotRecu = true;
+    } else {
+      const nouvelleNotif = notificationsActives.find(n =>
+        !idsConnus.has(n.id) && !lectures.has(n.id)
+      );
+
+      notificationsActives.forEach(n => idsConnus.add(n.id));
+
+      if (nouvelleNotif) {
+        const titre = nouvelleNotif.title || "Stade Montois TT";
+        const corps = nouvelleNotif.body || nouvelleNotif.message || "Une nouvelle information est disponible.";
+        const url = nouvelleNotif.appUrl || nouvelleNotif.url || "";
+        afficherBandeauNotification(titre, corps, url);
+      }
+    }
 
     actualiserPastilles();
 
