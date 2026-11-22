@@ -10,6 +10,8 @@ CLIENT_SECRET = os.environ["HELLOASSO_CLIENT_SECRET"]
 
 ORGANIZATION = "stade-montois-omnisports-tennis-de-table"
 
+USER_AGENT = "SMTT-Notifications/1.0"
+
 def main():
     print("1. Connexion à HelloAsso...")
 
@@ -24,7 +26,11 @@ def main():
     request = urllib.request.Request(
         token_url,
         data=token_data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"}
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "User-Agent": USER_AGENT
+        }
     )
 
     with urllib.request.urlopen(request, timeout=30) as response:
@@ -58,7 +64,8 @@ def main():
         url,
         headers={
             "Authorization": "Bearer " + access_token,
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "User-Agent": USER_AGENT
         }
     )
 
@@ -72,22 +79,18 @@ def main():
         print("Champs reçus :", list(result.keys()))
 
         forms = result.get("data", [])
+
         if isinstance(forms, list):
             print("Nombre de formulaires trouvés :", len(forms))
 
             for form in forms:
                 if isinstance(form, dict):
-                    name = (
-                        form.get("formName")
-                        or form.get("name")
-                        or "Nom non identifié"
-                    )
+                    name = form.get("formName") or form.get("name") or "Nom non identifié"
                     print("- ", name)
-        else:
-            print("Structure des formulaires à examiner.")
 
     elif isinstance(result, list):
         print("Nombre de formulaires trouvés :", len(result))
+
         for form in result:
             if isinstance(form, dict):
                 print("- ", form.get("formName", "Nom non identifié"))
