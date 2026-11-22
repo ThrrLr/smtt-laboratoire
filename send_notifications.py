@@ -53,6 +53,9 @@ YOUTUBE_FEED_URL = (
 FACEBOOK_FEED_URL = "https://fetchrss.com/feed/1xUlSA4LZE6M1xUlR77gK5bu.rss"
 FACEBOOK_TOPIC = "smtt_actus"
 
+# Page HelloAsso du Stade Montois TT
+HELLOASSO_URL = "https://www.helloasso.com/associations/stade-montois-omnisports-tennis-de-table"
+
 
 # ==========================================
 # CONNEXION FIREBASE
@@ -535,6 +538,67 @@ def surveiller_facebook():
 
 
 # ==========================================
+# SURVEILLANCE HELLOASSO
+# ==========================================
+
+def surveiller_helloasso():
+
+    print("Surveillance HelloAsso SMTT démarrée.")
+
+    try:
+        requete = urllib.request.Request(
+            HELLOASSO_URL,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+
+        with urllib.request.urlopen(requete, timeout=20) as reponse:
+            html = reponse.read().decode("utf-8", errors="ignore")
+
+        empreinte = hashlib.sha256(html.encode("utf-8")).hexdigest()
+        etat_ref = db.collection("helloasso_monitor").document("page_principale")
+        etat = etat_ref.get()
+
+        # Premier passage : mémorisation de l'état initial sans notifier.
+        if not etat.exists:
+            etat_ref.set({
+                "initialized": True,
+                "lastHash": empreinte
+            })
+            print("État initial HelloAsso mémorisé sans notification.")
+            return
+
+        ancien_hash = (etat.to_dict() or {}).get("lastHash")
+
+        if empreinte != ancien_hash:
+            notification_id = hashlib.sha256(
+                f"helloasso_{empreinte}".encode("utf-8")
+            ).hexdigest()
+
+            db.collection("notifications").document(notification_id).set({
+                "category": "helloasso",
+                "title": "🏓 Nouveauté HelloAsso SMTT",
+                "body": "Un nouveau stage ou une nouvelle offre est disponible sur HelloAsso !",
+                "source": "HelloAsso",
+                "url": HELLOASSO_URL,
+                "appUrl": HELLOASSO_URL,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "pushSent": False
+            })
+
+            etat_ref.set({
+                "initialized": True,
+                "lastHash": empreinte
+            }, merge=True)
+
+            print("Nouveauté détectée sur HelloAsso !")
+        else:
+            print("Aucun changement détecté sur HelloAsso.")
+
+    except Exception as erreur:
+        print("Erreur surveillance HelloAsso :", erreur)
+
+
+# ==========================================
 # ABONNEMENT OPTIONNEL AU SUJET smtt_actus
 # ==========================================
 
@@ -704,6 +768,8 @@ def main():
     surveiller_youtube()
 
     surveiller_facebook()
+
+    surveiller_helloasso()
 
     envoyer_notifications_en_attente()
 
