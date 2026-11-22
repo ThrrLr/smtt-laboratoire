@@ -718,8 +718,13 @@ def envoyer_notifications_en_attente():
                     token=token,
                     webpush=messaging.WebpushConfig(
                         headers={
-                            "Urgency": "high"
+                            "Urgency": "high",
+                            "TTL": "86400"
                         },
+                        notification=messaging.WebpushNotification(
+                            title=titre,
+                            body=corps
+                        ),
                         fcm_options=messaging.WebpushFCMOptions(
                             link=lien_cible
                         )
