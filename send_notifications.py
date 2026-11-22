@@ -20,8 +20,7 @@ FIREBASE_SERVICE_ACCOUNT = json.loads(
 )
 
 DRIVE_SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
-    "https://www.googleapis.com/auth/spreadsheets.readonly"
+    "https://www.googleapis.com/auth/drive.readonly"
 ]
 
 DRIVE_SOURCES = [
@@ -54,10 +53,13 @@ YOUTUBE_FEED_URL = (
 FACEBOOK_FEED_URL = "https://fetchrss.com/feed/1xUlSA4LZE6M1xUlR77gK5bu.rss"
 FACEBOOK_TOPIC = "smtt_actus"
 
-# Page HelloAsso du Stade Montois TT + cellule Google Sheet surveillée (A5)
+# Page HelloAsso du Stade Montois TT + Google Sheet CSV (ligne 5 = A5)
 HELLOASSO_URL = "https://www.helloasso.com/associations/stade-montois-omnisports-tennis-de-table"
-HELLOASSO_SHEET_ID = "1PkxeVKZ1zbfUWRuQFZ5VYc06uEgDKwfJ"
-HELLOASSO_SHEET_RANGE = "A5"
+HELLOASSO_SHEET_CSV_URL = (
+    "https://docs.google.com/spreadsheets/d/e/"
+    "2PACX-1vROcLSItSbZn-h5tLyorTcCdS7IL6EuLbuzwnEHHez7HeFrzoFg-Hmvg6lodTbkKQdy5_s_t2xQPtpl"
+    "/pub?output=csv"
+)
 
 
 # ==========================================
@@ -74,7 +76,7 @@ db = firestore.client()
 
 
 # ==========================================
-# CONNEXION GOOGLE DRIVE & SHEETS
+# CONNEXION GOOGLE DRIVE
 # ==========================================
 
 drive_credential = service_account.Credentials.from_service_account_info(
@@ -85,13 +87,6 @@ drive_credential = service_account.Credentials.from_service_account_info(
 drive = build(
     "drive",
     "v3",
-    credentials=drive_credential,
-    cache_discovery=False
-)
-
-sheets = build(
-    "sheets",
-    "v4",
     credentials=drive_credential,
     cache_discovery=False
 )
@@ -548,7 +543,7 @@ def surveiller_facebook():
 
 
 # ==========================================
-# SURVEILLANCE HELLOASSO (VIA GOOGLE SHEET)
+# SURVEILLANCE HELLOASSO (VIA GOOGLE SHEET CSV)
 # ==========================================
 
 def surveiller_helloasso():
@@ -556,15 +551,21 @@ def surveiller_helloasso():
     print("Surveillance HelloAsso SMTT démarrée.")
 
     try:
-        resultat = sheets.spreadsheets().values().get(
-            spreadsheetId=HELLOASSO_SHEET_ID,
-            range=HELLOASSO_SHEET_RANGE
-        ).execute()
+        requete = urllib.request.Request(
+            HELLOASSO_SHEET_CSV_URL,
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
 
-        valeurs = resultat.get("values", [])
+        with urllib.request.urlopen(requete, timeout=20) as reponse:
+            texte_csv = reponse.read().decode("utf-8", errors="ignore")
+
+        lignes = texte_csv.splitlines()
         texte_stage = ""
-        if valeurs and valeurs[0]:
-            texte_stage = str(valeurs[0][0]).strip()
+
+        # On regarde la ligne 5 (index 4), cellule A5
+        if len(lignes) > 4:
+            premiere_colonne = lignes[4].split(",")[0]
+            texte_stage = premiere_colonne.strip().strip('"').strip()
 
         etat_ref = db.collection("helloasso_monitor").document("stage_alerte")
         etat = etat_ref.get()
