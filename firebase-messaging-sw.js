@@ -13,20 +13,19 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  // Si Firebase envoie déjà un bloc "notification", le navigateur l'affiche déjà seul.
-  // On évite ainsi d'afficher une deuxième notification en doublon.
-  if (payload.notification) {
-    return;
-  }
-
   const donnees = payload.data || {};
-  const titre = donnees.title || "Stade Montois TT";
-  const corps = donnees.body || "Une nouvelle information est disponible.";
+  const notif = payload.notification || {};
+
+  const titre = donnees.title || notif.title || "Stade Montois TT";
+  const corps = donnees.body || notif.body || "Une nouvelle information est disponible.";
   const url = donnees.appUrl || donnees.url || "https://thrrlr.github.io/smtt/";
+  const tag = donnees.notificationId || `smtt-${Date.now()}`;
 
   return self.registration.showNotification(titre, {
     body: corps,
-    icon: "./icons/icon.svg",
+    icon: "./icons/icon-192.png",
+    tag: tag,
+    renotify: false,
     data: { url: url }
   });
 });
