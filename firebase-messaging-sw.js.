@@ -13,26 +13,20 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const notification = payload.notification || {};
+  // Si Firebase envoie déjà un bloc "notification", le navigateur l'affiche déjà seul.
+  // On évite ainsi d'afficher une deuxième notification en doublon.
+  if (payload.notification) {
+    return;
+  }
+
   const donnees = payload.data || {};
-
-  const titre =
-    notification.title ||
-    donnees.title ||
-    "Stade Montois TT";
-
-  const corps =
-    notification.body ||
-    donnees.body ||
-    "Une nouvelle information est disponible.";
-
-  const url =
-    donnees.appUrl ||
-    "https://thrrlr.github.io/smtt/";
+  const titre = donnees.title || "Stade Montois TT";
+  const corps = donnees.body || "Une nouvelle information est disponible.";
+  const url = donnees.appUrl || donnees.url || "https://thrrlr.github.io/smtt/";
 
   return self.registration.showNotification(titre, {
     body: corps,
-    icon: notification.icon || "./icons/icon.svg",
+    icon: "./icons/icon.svg",
     data: { url: url }
   });
 });
@@ -54,6 +48,7 @@ self.addEventListener("notificationclick", (event) => {
           client.url.startsWith("https://thrrlr.github.io/smtt/") &&
           "focus" in client
         ) {
+          client.navigate(url);
           return client.focus();
         }
       }
