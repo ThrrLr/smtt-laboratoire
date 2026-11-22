@@ -23,7 +23,6 @@ messaging.onBackgroundMessage((payload) => {
 
   return self.registration.showNotification(titre, {
     body: corps,
-    icon: "./icons/icon-192.png",
     tag: tag,
     renotify: false,
     data: { url: url }
