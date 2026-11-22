@@ -1,9 +1,6 @@
 
 
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
-
-const CACHE = "smtt-v60";
+const CACHE = "smtt-v61";
 const BASE_URL = new URL("./", self.location).href;
 
 const FILES = [
@@ -15,41 +12,6 @@ const FILES = [
   "./icons/icon.svg",
   "./icons/logo-smtt.svg"
 ];
-
-firebase.initializeApp({
-  apiKey: "AIzaSyCi0apSMq-xuZAj-rahE32w5HXtOh604oU",
-  authDomain: "smtt-notifications.firebaseapp.com",
-  projectId: "smtt-notifications",
-  storageBucket: "smtt-notifications.firebasestorage.app",
-  messagingSenderId: "671610991236",
-  appId: "1:671610991236:web:63efe6ead81520de6988d1"
-});
-
-const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-  const donnees = payload.data || {};
-  const notification = payload.notification || {};
-
-  const titre =
-    donnees.title ||
-    notification.title ||
-    "Stade Montois TT";
-
-  const corps =
-    donnees.body ||
-    notification.body ||
-    "Une nouvelle information est disponible.";
-
-  const url = donnees.appUrl || donnees.url || BASE_URL;
-
-  return self.registration.showNotification(titre, {
-    body: corps,
-    icon: donnees.icon || "./icons/icon.svg",
-    badge: "./icons/icon.svg",
-    data: { url }
-  });
-});
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
