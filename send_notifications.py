@@ -20,7 +20,8 @@ FIREBASE_SERVICE_ACCOUNT = json.loads(
 )
 
 DRIVE_SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly"
+    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/spreadsheets.readonly"
 ]
 
 DRIVE_SOURCES = [
@@ -53,8 +54,10 @@ YOUTUBE_FEED_URL = (
 FACEBOOK_FEED_URL = "https://fetchrss.com/feed/1xUlSA4LZE6M1xUlR77gK5bu.rss"
 FACEBOOK_TOPIC = "smtt_actus"
 
-# Page HelloAsso du Stade Montois TT
+# Page HelloAsso du Stade Montois TT + cellule Google Sheet surveillée (A5)
 HELLOASSO_URL = "https://www.helloasso.com/associations/stade-montois-omnisports-tennis-de-table"
+HELLOASSO_SHEET_ID = "1PkxeVKZ1zbfUWRuQFZ5VYc06uEgDKwfJ"
+HELLOASSO_SHEET_RANGE = "A5"
 
 
 # ==========================================
@@ -71,7 +74,7 @@ db = firestore.client()
 
 
 # ==========================================
-# CONNEXION GOOGLE DRIVE
+# CONNEXION GOOGLE DRIVE & SHEETS
 # ==========================================
 
 drive_credential = service_account.Credentials.from_service_account_info(
@@ -82,6 +85,13 @@ drive_credential = service_account.Credentials.from_service_account_info(
 drive = build(
     "drive",
     "v3",
+    credentials=drive_credential,
+    cache_discovery=False
+)
+
+sheets = build(
+    "sheets",
+    "v4",
     credentials=drive_credential,
     cache_discovery=False
 )
@@ -538,7 +548,7 @@ def surveiller_facebook():
 
 
 # ==========================================
-# SURVEILLANCE HELLOASSO
+# SURVEILLANCE HELLOASSO (VIA GOOGLE SHEET)
 # ==========================================
 
 def surveiller_helloasso():
@@ -546,42 +556,39 @@ def surveiller_helloasso():
     print("Surveillance HelloAsso SMTT démarrée.")
 
     try:
-        requete = urllib.request.Request(
-            HELLOASSO_URL,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
-            }
-        )
+        resultat = sheets.spreadsheets().values().get(
+            spreadsheetId=HELLOASSO_SHEET_ID,
+            range=HELLOASSO_SHEET_RANGE
+        ).execute()
 
-        with urllib.request.urlopen(requete, timeout=20) as reponse:
-            html = reponse.read().decode("utf-8", errors="ignore")
+        valeurs = resultat.get("values", [])
+        texte_stage = ""
+        if valeurs and valeurs[0]:
+            texte_stage = str(valeurs[0][0]).strip()
 
-        empreinte = hashlib.sha256(html.encode("utf-8")).hexdigest()
-        etat_ref = db.collection("helloasso_monitor").document("page_principale")
+        etat_ref = db.collection("helloasso_monitor").document("stage_alerte")
         etat = etat_ref.get()
 
         # Premier passage : mémorisation de l'état initial sans notifier.
         if not etat.exists:
             etat_ref.set({
                 "initialized": True,
-                "lastHash": empreinte
+                "lastValue": texte_stage
             })
             print("État initial HelloAsso mémorisé sans notification.")
             return
 
-        ancien_hash = (etat.to_dict() or {}).get("lastHash")
+        ancienne_valeur = str((etat.to_dict() or {}).get("lastValue") or "").strip()
 
-        if empreinte != ancien_hash:
+        if texte_stage and texte_stage != ancienne_valeur:
             notification_id = hashlib.sha256(
-                f"helloasso_{empreinte}".encode("utf-8")
+                f"helloasso_{texte_stage}".encode("utf-8")
             ).hexdigest()
 
             db.collection("notifications").document(notification_id).set({
                 "category": "helloasso",
-                "title": "🏓 Nouveauté HelloAsso SMTT",
-                "body": "Un nouveau stage ou une nouvelle offre est disponible sur HelloAsso !",
+                "title": "🏓 Nouveau stage HelloAsso SMTT",
+                "body": texte_stage,
                 "source": "HelloAsso",
                 "url": HELLOASSO_URL,
                 "appUrl": HELLOASSO_URL,
@@ -591,12 +598,16 @@ def surveiller_helloasso():
 
             etat_ref.set({
                 "initialized": True,
-                "lastHash": empreinte
+                "lastValue": texte_stage
             }, merge=True)
 
-            print("Nouveauté détectée sur HelloAsso !")
+            print("Nouveau stage HelloAsso détecté :", texte_stage)
         else:
-            print("Aucun changement détecté sur HelloAsso.")
+            etat_ref.set({
+                "initialized": True,
+                "lastValue": texte_stage
+            }, merge=True)
+            print("Aucun nouveau stage HelloAsso détecté.")
 
     except Exception as erreur:
         print("Erreur surveillance HelloAsso :", erreur)
