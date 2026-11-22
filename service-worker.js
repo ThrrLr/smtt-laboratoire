@@ -1,10 +1,8 @@
 
-
-
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js');
 
-const CACHE = "smtt-v65";
+const CACHE = "smtt-v66";
 const BASE_URL = new URL("./", self.location).href;
 
 const FILES = [
@@ -29,27 +27,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const donnees = payload.data || {};
-  const notification = payload.notification || {};
-
-  const titre =
-    donnees.title ||
-    notification.title ||
-    "Stade Montois TT";
-
-  const corps =
-    donnees.body ||
-    notification.body ||
-    "Une nouvelle information est disponible.";
-
-  const url = donnees.appUrl || donnees.url || BASE_URL;
-
-  return self.registration.showNotification(titre, {
-    body: corps,
-    icon: donnees.icon || "./icons/icon.svg",
-    badge: "./icons/icon.svg",
-    data: { url }
-  });
+  console.log("Notification reçue en arrière-plan :", payload);
 });
 
 self.addEventListener("notificationclick", (event) => {
