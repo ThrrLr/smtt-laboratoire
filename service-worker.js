@@ -1,6 +1,6 @@
 
 
-const CACHE = "smtt-v63";
+const CACHE = "smtt-v64";
 const BASE_URL = new URL("./", self.location).href;
 
 const FILES = [
