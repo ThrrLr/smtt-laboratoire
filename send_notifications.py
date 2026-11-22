@@ -720,9 +720,6 @@ def envoyer_notifications_en_attente():
                         headers={
                             "Urgency": "high"
                         },
-                        notification=messaging.WebpushNotification(
-                            icon="https://thrrlr.github.io/smtt/icons/icon.svg"
-                        ),
                         fcm_options=messaging.WebpushFCMOptions(
                             link=lien_cible
                         )
