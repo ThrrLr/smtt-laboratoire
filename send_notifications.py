@@ -1,7 +1,10 @@
+
 import os
 import json
 import hashlib
 import urllib.request
+import urllib.error
+import urllib.parse
 import xml.etree.ElementTree as ET
 
 import firebase_admin
@@ -49,8 +52,12 @@ YOUTUBE_FEED_URL = (
     + YOUTUBE_CHANNEL_ID
 )
 
-# Flux RSS Facebook (FetchRSS) du Stade Montois TT
-FACEBOOK_FEED_URL = "https://fetchrss.com/feed/1xUlSA4LZE6M1xUlR77gK5bu.rss"
+# Facebook : API Graph Meta
+FACEBOOK_PAGE_ID = "1091094834343855"
+FACEBOOK_PAGE_ACCESS_TOKEN = os.environ.get(
+    "FACEBOOK_PAGE_ACCESS_TOKEN", ""
+).strip()
+FACEBOOK_GRAPH_API_VERSION = "v27.0"
 FACEBOOK_TOPIC = "smtt_actus"
 
 # Page HelloAsso du Stade Montois TT + Google Sheet CSV (ligne 5 = A5)
@@ -389,89 +396,121 @@ def surveiller_youtube():
 
 
 # ==========================================
-# SURVEILLANCE FACEBOOK (FETCHRSS)
+# SURVEILLANCE FACEBOOK (API GRAPH META)
 # ==========================================
 
 def surveiller_facebook():
 
-    if not FACEBOOK_FEED_URL:
-        print("Aucun flux Facebook configuré.")
+    if not FACEBOOK_PAGE_ACCESS_TOKEN:
+        print(
+            "Erreur Facebook : le secret "
+            "FACEBOOK_PAGE_ACCESS_TOKEN est absent."
+        )
         return
 
-    print("Surveillance Facebook SMTT démarrée.")
+    print("Surveillance Facebook SMTT via Meta démarrée.")
 
     try:
-        requete = urllib.request.Request(
-            FACEBOOK_FEED_URL,
-            headers={"User-Agent": "Mozilla/5.0"}
+        parametres = urllib.parse.urlencode({
+            "fields": "id,message,created_time,permalink_url,is_published",
+            "limit": 25
+        })
+
+        url_api = (
+            f"https://graph.facebook.com/"
+            f"{FACEBOOK_GRAPH_API_VERSION}/"
+            f"{FACEBOOK_PAGE_ID}/feed?{parametres}"
         )
 
-        with urllib.request.urlopen(requete, timeout=20) as reponse:
-            contenu = reponse.read()
+        requete = urllib.request.Request(
+            url_api,
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Authorization": (
+                    "Bearer " + FACEBOOK_PAGE_ACCESS_TOKEN
+                )
+            }
+        )
 
-        racine = ET.fromstring(contenu)
+        with urllib.request.urlopen(requete, timeout=30) as reponse:
+            resultat_api = json.loads(
+                reponse.read().decode("utf-8")
+            )
 
+        publications = resultat_api.get("data", [])
         posts = []
 
-        # Format RSS classique (<item>)
-        for item in racine.findall(".//item"):
-            guid = (item.findtext("guid") or "").strip()
-            lien = (item.findtext("link") or "").strip()
-            titre = (item.findtext("title") or "").strip()
-            description = (item.findtext("description") or "").strip()
+        for publication in publications:
 
-            identifiant = guid or lien or f"{titre}_{description[:80]}"
-            resume = titre or description[:100] or "Nouvelle publication Facebook du club."
+            identifiant = str(publication.get("id") or "").strip()
 
-            if identifiant:
-                posts.append({
-                    "id": identifiant,
-                    "title": "🏓 Actualité Facebook SMTT",
-                    "body": resume,
-                    "url": lien or "https://www.facebook.com"
-                })
+            if not identifiant:
+                continue
 
-        # Repli format Atom (<entry>) si nécessaire
+            if publication.get("is_published") is False:
+                continue
+
+            message = str(
+                publication.get("message") or ""
+            ).strip()
+
+            resume = (
+                message[:180]
+                if message
+                else "Nouvelle publication Facebook du club."
+            )
+
+            lien = str(
+                publication.get("permalink_url") or ""
+            ).strip()
+
+            if not lien:
+                lien = (
+                    "https://www.facebook.com/"
+                    + identifiant
+                )
+
+            posts.append({
+                "id": identifiant,
+                "title": "🏓 Actualité Facebook SMTT",
+                "body": resume,
+                "url": lien,
+                "created_time": publication.get("created_time", "")
+            })
+
         if not posts:
-            atom = "{http://www.w3.org/2005/Atom}"
-            for entry in racine.findall(f"{atom}entry"):
-                entry_id = (entry.findtext(f"{atom}id") or "").strip()
-                titre = (entry.findtext(f"{atom}title") or "").strip()
-                lien_elem = entry.find(f"{atom}link")
-                lien = (lien_elem.get("href") if lien_elem is not None else "") or ""
-                identifiant = entry_id or lien or titre
-                if identifiant:
-                    posts.append({
-                        "id": identifiant,
-                        "title": "🏓 Actualité Facebook SMTT",
-                        "body": titre or "Nouvelle publication Facebook du club.",
-                        "url": lien or "https://www.facebook.com"
-                    })
-
-        if not posts:
-            print("Aucune publication trouvée dans le flux Facebook.")
+            print(
+                "Aucune publication Facebook trouvée dans la réponse Meta."
+            )
             return
 
-        etat_id = hashlib.sha256(
-            FACEBOOK_FEED_URL.encode("utf-8")
-        ).hexdigest()
+        # Identifiant distinct de l'ancien suivi FetchRSS.
+        etat_ref = db.collection("facebook_monitor").document(
+            "meta_" + FACEBOOK_PAGE_ID
+        )
 
-        etat_ref = db.collection("facebook_monitor").document(etat_id)
         etat = etat_ref.get()
 
-        # Premier passage : mémorisation des publications existantes sans notifier.
+        # Premier passage : mémorisation des publications existantes
+        # sans envoyer de notification.
         if not etat.exists:
+
             batch = db.batch()
 
             for post in posts:
+
                 post_hash = hashlib.sha256(
-                    post["id"].encode("utf-8")
+                    ("meta_" + post["id"]).encode("utf-8")
                 ).hexdigest()
 
-                post_ref = db.collection("facebook_seen").document(post_hash)
+                post_ref = db.collection("facebook_seen").document(
+                    post_hash
+                )
+
                 batch.set(post_ref, {
                     "postId": post["id"],
                     "url": post["url"],
+                    "createdTime": post["created_time"],
                     "initialized": True
                 })
 
@@ -481,21 +520,27 @@ def surveiller_facebook():
             })
 
             batch.commit()
+
             print(
                 len(posts),
                 "publications Facebook existantes mémorisées sans notification."
             )
+
             return
 
         # Passages suivants : détection des nouvelles publications.
         nouvelles = 0
 
         for post in reversed(posts):
+
             post_hash = hashlib.sha256(
-                post["id"].encode("utf-8")
+                ("meta_" + post["id"]).encode("utf-8")
             ).hexdigest()
 
-            post_ref = db.collection("facebook_seen").document(post_hash)
+            post_ref = db.collection("facebook_seen").document(
+                post_hash
+            )
+
             if post_ref.get().exists:
                 continue
 
@@ -508,9 +553,11 @@ def surveiller_facebook():
             )
 
             batch = db.batch()
+
             batch.set(post_ref, {
                 "postId": post["id"],
                 "url": post["url"],
+                "createdTime": post["created_time"],
                 "initialized": True
             })
 
@@ -526,8 +573,13 @@ def surveiller_facebook():
             })
 
             batch.commit()
+
             nouvelles += 1
-            print("Nouvelle publication Facebook détectée :", post["body"])
+
+            print(
+                "Nouvelle publication Facebook détectée :",
+                post["body"]
+            )
 
         batch = db.batch()
         batch.set(etat_ref, {
@@ -536,10 +588,34 @@ def surveiller_facebook():
         }, merge=True)
         batch.commit()
 
-        print(nouvelles, "nouvelle(s) publication(s) Facebook détectée(s).")
+        print(
+            nouvelles,
+            "nouvelle(s) publication(s) Facebook détectée(s)."
+        )
+
+    except urllib.error.HTTPError as erreur:
+
+        # Ne jamais afficher l'URL complète ni le jeton d'accès.
+        try:
+            details = json.loads(
+                erreur.read().decode("utf-8")
+            )
+            message_erreur = (
+                details.get("error", {}).get("message")
+                or "Erreur renvoyée par Meta."
+            )
+        except Exception:
+            message_erreur = "Réponse d'erreur illisible de Meta."
+
+        print(
+            "Erreur API Facebook HTTP",
+            erreur.code,
+            ":",
+            message_erreur
+        )
 
     except Exception as erreur:
-        print("Erreur surveillance Facebook :", erreur)
+        print("Erreur surveillance Facebook :", str(erreur))
 
 
 # ==========================================
