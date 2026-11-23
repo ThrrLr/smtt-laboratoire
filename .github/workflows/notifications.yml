@@ -34,4 +34,5 @@ jobs:
           TEST_UID: ${{ secrets.TEST_UID }}
           HELLOASSO_CLIENT_ID: ${{ secrets.HELLOASSO_CLIENT_ID }}
           HELLOASSO_CLIENT_SECRET: ${{ secrets.HELLOASSO_CLIENT_SECRET }}
+          FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
         run: python send_notifications.py
